@@ -1,0 +1,7 @@
+venv
+.vscode
+*.csv
+*.gpkg
+*.png
+*.qmd
+*.qgz
