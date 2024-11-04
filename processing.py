@@ -8,13 +8,14 @@ from io import BytesIO
 import geopandas as gpd
 
 
-
 BASE_URL = 'https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/'
 FIELD_DICT = {
     'details': ['EVENT_TYPE', 'DAMAGE_PROPERTY', "EVENT_ID"],
     'locations': ["EVENT_ID", 'LATITUDE', 'LONGITUDE']
 }
-def get_files():
+
+def get_files() -> list:
+    """Parse HTML to get download paths"""
     resp = requests.get(BASE_URL)
     soup = BeautifulSoup(resp.text, 'html.parser')
     table = soup.find('table')
@@ -26,14 +27,16 @@ def get_files():
                 hrefs.append(el[0].text)
     return hrefs
 
-def download_file(f, dest):
+def download_file(f: str) -> str:
+    """Download and decompress CSV data"""
     with urllib.request.urlopen(BASE_URL + f) as response:
         compressed_data = response.read()
     with gzip.GzipFile(fileobj=BytesIO(compressed_data)) as gz_file:
         decompressed_data = gz_file.read()
     return decompressed_data
 
-def expand_value(value):
+def expand_value(value: str) -> str:
+    """Convert abbreviations to numbers"""
     value = str(value)
     if value == 'nan' or value == '0' or value == '0.00' or len(value) == 1:
         return 0
@@ -47,7 +50,8 @@ def expand_value(value):
         raise RuntimeError(value)  # No suffix, assume it's already numeric
 
 
-def download_data():
+def download_data() -> None:
+    """Run all functions to download datasets, subset columns, merge data, and save to a file"""
     hrefs = get_files()
     all_df = {t: [] for t in FIELD_DICT}
     for ind, h in enumerate(hrefs):
@@ -61,7 +65,8 @@ def download_data():
     for a in all_df:
         pd.concat(all_df[a]).to_csv(f'{a}_all.csv')
 
-def merge_intersect():
+def merge_intersect() -> None:
+    """Merge detail and location datasets, intersect with polygon layer, and aggregate"""
     pts = pd.read_csv('locations_all.csv')
     details = pd.read_csv('details_all.csv')
     states = gpd.read_file('conus_grid.gpkg')[['id', 'geometry']]
@@ -81,5 +86,10 @@ def merge_intersect():
 
     most_common_cat.to_csv('aggregated.csv')
 
-# download_data()
-merge_intersect()
+def main():
+    """Get data, aggregate, and save processed dataset"""
+    download_data()
+    merge_intersect()
+
+if __name__ == '__main__':
+    main()
